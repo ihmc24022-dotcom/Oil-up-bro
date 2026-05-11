@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>愤怒的小鸟卡牌开包模拟器</title>
+    <style>
+        :root {
+            --primary-color: #e31e24; /* 愤怒的小鸟红 */
+            --secondary-color: #fcc200; /* 愤怒的小鸟黄 */
+            --bg-color: #87ceeb; /* 天空蓝 */
+            --card-width: 150px;
+            --card-height: 210px;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(#ffffff 1px, transparent 1px);
+            background-size: 20px 20px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            width: 100%;
+            padding: 20px 0;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            border-bottom: 5px solid var(--secondary-color);
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 90%;
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .pack-section {
+            margin-bottom: 50px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .pack {
+            width: 180px;
+            cursor: pointer;
+            transition: transform 0.3s, filter 0.3s;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.4));
+            border-radius: 10px;
+        }
+
+        .pack:hover {
+            transform: scale(1.08) rotate(-3deg);
+            filter: drop-shadow(0 15px 30px rgba(0,0,0,0.5));
+        }
+
+        .pack:active {
+            transform: scale(0.95);
+        }
+
+        .stats {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: #333;
+            font-weight: bold;
+        }
+
+        /* 抽卡弹窗 */
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        /* 卡牌样式 */
+        .card-container {
+            width: var(--card-width);
+            height: var(--card-height);
+            perspective: 1000px;
+            cursor: pointer;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+
+        .card-container.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.5);
+        }
+
+        .card-back {
+            background: #e31e24;
+            border: 6px solid #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-image: url('https://files.manuscdn.com/user_upload_by_module/session_file/310519663598505525/rncBefTPTKwoGEXd.jpeg');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .card-front {
+            background: white;
+            transform: rotateY(180deg);
+            display: flex;
+            flex-direction: column;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 5px solid #ddd;
+        }
+
+        .card-front.rarity-R { border-color: #c0c0c0; background: linear-gradient(135deg, #fff 0%, #f0f0f0 100%); }
+        .card-front.rarity-SR { border-color: #ffd700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.6); }
+        .card-front.rarity-UR { border-color: #ff4500; box-shadow: 0 0 25px rgba(255, 69, 0, 0.8); animation: glow 1.5s infinite alternate; }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 10px #ff4500; }
+            to { box-shadow: 0 0 30px #ff4500; }
+        }
+
+        .card-img {
+            width: 100%;
+            height: 130px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 4em;
+            border: 1px solid #eee;
+        }
+
+        .card-name {
+            font-weight: bold;
+            font-size: 1em;
+            margin: 5px 0;
+            color: #333;
+        }
+
+        .card-type {
+            font-size: 0.85em;
+            color: #666;
+            background: #eee;
+            padding: 2px 8px;
+            border-radius: 10px;
+            display: inline-block;
+            margin: 0 auto;
+        }
+
+        .card-rarity {
+            margin-top: auto;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-align: right;
+            padding-right: 5px;
+            color: var(--primary-color);
+        }
+
+        .btn {
+            padding: 12px 40px;
+            font-size: 1.2em;
+            background-color: var(--secondary-color);
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 5px 0 #d4a300;
+            transition: all 0.1s;
+        }
+
+        .btn:hover {
+            background-color: #ffcc00;
+            transform: translateY(-2px);
+            box-shadow: 0 7px 0 #d4a300;
+        }
+
+        .btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0 #d4a300;
+        }
+
+        .collection-section {
+            width: 100%;
+            margin-top: 50px;
+            padding-bottom: 80px;
+        }
+
+        .collection-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .collected-card {
+            width: 130px;
+            height: 182px;
+            background: white;
+            border-radius: 10px;
+            padding: 8px;
+            box-sizing: border-box;
+            font-size: 0.8em;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .collected-card:hover {
+            transform: translateY(-5px);
+        }
+
+        @media (max-width: 800px) {
+            .result-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>愤怒的小鸟卡牌开包模拟器</h1>
+</header>
+
+<div class="container">
+    <div class="pack-section">
+        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663598505525/rncBefTPTKwoGEXd.jpeg" alt="卡包" class="pack" id="draw-btn">
+        <p style="font-size: 1.2em; color: #444; margin-top: 20px;">点击卡包开启 (包含 5 张卡牌)</p>
+        <div class="stats">
+            已开启卡包: <span id="packs-opened" style="color: var(--primary-color);">0</span> | 已收集卡牌: <span id="cards-collected" style="color: var(--primary-color);">0</span>
+        </div>
+    </div>
+
+    <div class="collection-section">
+        <h2 style="color: #333; border-bottom: 3px solid var(--primary-color); display: inline-block; padding-bottom: 5px;">我的收藏</h2>
+        <div class="collection-grid" id="collection-grid">
+            <!-- 收藏的卡牌将显示在这里 -->
+        </div>
+    </div>
+</div>
+
+<div id="overlay">
+    <div class="result-grid" id="result-grid">
+        <!-- 抽中的卡牌将显示在这里 -->
+    </div>
+    <button class="btn" id="close-overlay" style="display: none;">返回游戏</button>
+</div>
+
+<script>
+    // 卡牌数据库 - 愤怒的小鸟主题
+    const cardPool = [
+        { id: 1, name: "怒鸟红 (Red)", type: "经典", rarity: "C", emoji: "🔴" },
+        { id: 2, name: "飞镖黄 (Chuck)", type: "速度", rarity: "C", emoji: "🟡" },
+        { id: 3, name: "炸弹黑 (Bomb)", type: "爆炸", rarity: "U", emoji: "⚫" },
+        { id: 4, name: "蓝弟弟 (The Blues)", type: "分裂", rarity: "C", emoji: "🔵" },
+        { id: 5, name: "白公主 (Matilda)", type: "下蛋", rarity: "U", emoji: "⚪" },
+        { id: 6, name: "长嘴绿 (Hal)", type: "回旋", rarity: "U", emoji: "🟢" },
+        { id: 7, name: "大红 (Terence)", type: "重型", rarity: "R", emoji: "👹" },
+        { id: 8, name: "泡泡橙 (Bubbles)", type: "膨胀", rarity: "R", emoji: "🟠" },
+        { id: 9, name: "炫舞银 (Silver)", type: "特技", rarity: "R", emoji: "🔘" },
+        { id: 10, name: "普通猪 (Minion Pig)", type: "反派", rarity: "C", emoji: "🐷" },
+        { id: 11, name: "钢盔猪 (Corporal Pig)", type: "防御", rarity: "U", emoji: "🪖" },
+        { id: 12, name: "胡须猪 (Foreman Pig)", type: "精英", rarity: "R", emoji: "🧔" },
+        { id: 13, name: "猪王 (King Pig)", type: "首领", rarity: "SR", emoji: "👑" },
+        { id: 14, name: "神鹰 (Mighty Eagle)", type: "传奇", rarity: "UR", emoji: "🦅" },
+        { id: 15, name: "黄金蛋 (Golden Egg)", type: "宝藏", rarity: "UR", emoji: "🥚" }
+    ];
+
+    const rarityWeights = {
+        "C": 60,
+        "U": 25,
+        "R": 10,
+        "SR": 4,
+        "UR": 1
+    };
+
+    let openedPacks = 0;
+    let collection = JSON.parse(localStorage.getItem('angry_birds_collection')) || [];
+
+    const drawBtn = document.getElementById('draw-btn');
+    const overlay = document.getElementById('overlay');
+    const resultGrid = document.getElementById('result-grid');
+    const closeOverlayBtn = document.getElementById('close-overlay');
+    const collectionGrid = document.getElementById('collection-grid');
+    const packsOpenedText = document.getElementById('packs-opened');
+    const cardsCollectedText = document.getElementById('cards-collected');
+
+    // 初始化显示
+    updateStats();
+    renderCollection();
+
+    drawBtn.addEventListener('click', () => {
+        openPack();
+    });
+
+    closeOverlayBtn.addEventListener('click', () => {
+        overlay.style.display = 'none';
+        closeOverlayBtn.style.display = 'none';
+        renderCollection();
+    });
+
+    function openPack() {
+        openedPacks++;
+        resultGrid.innerHTML = '';
+        overlay.style.display = 'flex';
+        
+        const results = [];
+        for (let i = 0; i < 5; i++) {
+            const card = getRandomCard();
+            results.push(card);
+            createCardElement(card, i);
+            
+            // 添加到收藏
+            if (!collection.find(c => c.id === card.id)) {
+                collection.push(card);
+            }
+        }
+        
+        localStorage.setItem('angry_birds_collection', JSON.stringify(collection));
+        updateStats();
+
+        // 检查是否所有卡牌都已翻开
+        let flippedCount = 0;
+        document.querySelectorAll('.card-container').forEach(card => {
+            card.addEventListener('click', function() {
+                if (!this.classList.contains('flipped')) {
+                    this.classList.add('flipped');
+                    flippedCount++;
+                    if (flippedCount === 5) {
+                        setTimeout(() => {
+                            closeOverlayBtn.style.display = 'block';
+                        }, 500);
+                    }
+                }
+            });
+        });
+    }
+
+    function getRandomCard() {
+        const rand = Math.random() * 100;
+        let cumulative = 0;
+        let selectedRarity = "C";
+
+        for (const [rarity, weight] of Object.entries(rarityWeights)) {
+            cumulative += weight;
+            if (rand <= cumulative) {
+                selectedRarity = rarity;
+                break;
+            }
+        }
+
+        const possibleCards = cardPool.filter(c => c.rarity === selectedRarity);
+        return possibleCards[Math.floor(Math.random() * possibleCards.length)];
+    }
+
+    function createCardElement(card, index) {
+        const container = document.createElement('div');
+        container.className = 'card-container';
+        container.style.transitionDelay = `${index * 0.1}s`;
+        
+        container.innerHTML = `
+            <div class="card-inner">
+                <div class="card-back"></div>
+                <div class="card-front rarity-${card.rarity}">
+                    <div class="card-img">${card.emoji}</div>
+                    <div class="card-name">${card.name}</div>
+                    <div class="card-type">${card.type}</div>
+                    <div class="card-rarity">${card.rarity}</div>
+                </div>
+            </div>
+        `;
+        
+        resultGrid.appendChild(container);
+    }
+
+    function renderCollection() {
+        collectionGrid.innerHTML = '';
+        // 按稀有度排序
+        const sortedCollection = [...collection].sort((a, b) => {
+            const order = { "UR": 0, "SR": 1, "R": 2, "U": 3, "C": 4 };
+            return order[a.rarity] - order[b.rarity];
+        });
+
+        sortedCollection.forEach(card => {
+            const div = document.createElement('div');
+            div.className = 'collected-card';
+            div.innerHTML = `
+                <div style="font-size: 2.5em; text-align: center;">${card.emoji}</div>
+                <div style="font-weight: bold; margin-top: 8px; text-align: center;">${card.name}</div>
+                <div style="text-align: center; color: #666; font-size: 0.9em;">${card.type}</div>
+                <div style="text-align: right; font-weight: bold; color: var(--primary-color); margin-top: 5px;">${card.rarity}</div>
+            `;
+            collectionGrid.appendChild(div);
+        });
+    }
+
+    function updateStats() {
+        packsOpenedText.innerText = openedPacks;
+        cardsCollectedText.innerText = collection.length;
+    }
+</script>
+
+</body>
+</html>
